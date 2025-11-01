@@ -223,8 +223,8 @@ If ARG is non-nil skip quitting the menu."
   (setq tabulated-list-format [("" 1 t)
                                ("Command" 75 t)
                                ("Directory" 40 t)
-                               ("Time" 7 t :right-align t)
                                ("Stat" 4 t :right-align t)
+                               ("Time" 7 t :right-align t)
                                ("When"  12 t :right-align t)])
   (setq tabulated-list-entries nil)
   (cl-flet ((format-time-diff (diff)
@@ -236,19 +236,19 @@ If ARG is non-nil skip quitting the menu."
         (let ((age (format-time-diff
                     (- (or end-time (time-to-seconds)) start-time)))
               (exit-code (cond (exit-status (format "%d" exit-status))
-                               (end-time "???")
-                               ("---")))
+                               (end-time "??")
+                               ("--")))
               (since
                (let ((seconds (- (time-to-seconds) start-time)))
                  (if (> seconds (* 7 24 60 60))
                      (format-time-string "%b %d %R" start-time)
                    (format "%s ago" (format-time-diff seconds))))))
           (push `(,item
-                  [,(if end-time "" "*")
+                  [""
                    ,name
                    ,(propertize directory 'face 'dired-directory)
-                   ,age
                    ,exit-code
+                   ,age
                    ,since])
                 tabulated-list-entries)))))
   (setq tabulated-list-entries (nreverse tabulated-list-entries))
