@@ -37,6 +37,7 @@
 (require 'cl-lib)
 (require 'tramp)
 (require 'shell)
+(require 'proced) ; face
 
 
 ;;; Custom
@@ -204,10 +205,6 @@ If ARG is non-nil skip quitting the menu."
                  (or (shell-command-menu--item-end-time item)
                      (time-to-seconds)))))
 
-(defun shell-command-menu--current-info (&rest _ignored)
-  (when-let* ((row (tabulated-list-get-id)))
-    (format "Command: %s" (shell-command-menu--item-name row))))
-
 (defun async-shell-command--fix-tramp (process)
   ;; TODO: Should upstream, this is clearly an oversight
   (when (processp process)
@@ -221,11 +218,11 @@ If ARG is non-nil skip quitting the menu."
 
 (defun shell-command-menu--refresh ()
   (setq tabulated-list-format [("" 1 t)
-                               ("Command" 75 t)
                                ("Directory" 40 t)
-                               ("Stat" 4 t :right-align t)
                                ("Time" 7 t :right-align t)
-                               ("When"  12 t :right-align t)])
+                               ("When"  12 t :right-align t)
+                               ("Stat" 4 t :right-align t)
+                               ("Command" 0 t)])
   (setq tabulated-list-entries nil)
   (cl-flet ((format-time-diff (diff)
               (cond ((> diff (* 24 60 60)) (format-seconds "%dd %hh" diff))
@@ -245,11 +242,11 @@ If ARG is non-nil skip quitting the menu."
                    (format "%s ago" (format-time-diff seconds))))))
           (push `(,item
                   [""
-                   ,name
-                   ,(propertize directory 'face 'dired-directory)
-                   ,exit-code
+                   ,directory
                    ,age
-                   ,since])
+                   ,since
+                   ,exit-code
+                   ,(propertize name 'face 'proced-executable)])
                 tabulated-list-entries)))))
   (setq tabulated-list-entries (nreverse tabulated-list-entries))
   (tabulated-list-init-header))
@@ -267,7 +264,6 @@ If ARG is non-nil skip quitting the menu."
 (define-derived-mode shell-command-menu-mode tabulated-list-mode "Shell Command Menu"
   "Major mode for listing the shell commands spawned by Emacs."
   :interactive nil
-  (add-hook 'eldoc-documentation-functions #'shell-command-menu--current-info nil t)
   (add-hook 'tabulated-list-revert-hook #'shell-command-menu--refresh nil t)
   (eldoc-mode 1))
 
