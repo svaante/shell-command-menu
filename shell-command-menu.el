@@ -7,8 +7,8 @@
 ;; Created: 2023
 ;; License: GPL-3.0-or-later
 ;; Version: 0.0.1
-;; Homepage: https://github.com/svaante/consult-shell-command
-;; Package-Requires: ((emacs "29.1") (consult))
+;; Homepage: https://github.com/svaante/shell-command-menu
+;; Package-Requires: ((emacs "29.1"))
 
 ;; This file is not part of GNU Emacs.
 
