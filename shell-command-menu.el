@@ -221,8 +221,9 @@ If ARG is non-nil skip quitting the menu."
 ;;; Mode
 
 (defun shell-command-menu--refresh ()
-  (setq tabulated-list-format [("Command" 75 t)
-                               ("Directory" 40 t :right-align t)
+  (setq tabulated-list-format [("" 1 t)
+                               ("Command" 75 t)
+                               ("Directory" 40 t)
                                ("Time" 7 t :right-align t)
                                ("Stat" 4 t :right-align t)
                                ("When"  12 t :right-align t)])
@@ -233,8 +234,7 @@ If ARG is non-nil skip quitting the menu."
                     (t (format-seconds "%mm %ss%z" diff)))))
     (dolist (item shell-command-menu-items)
       (with-slots (name directory start-time end-time exit-status) item
-        (let ((directory (string-truncate-left directory 30))
-              (age (format-time-diff
+        (let ((age (format-time-diff
                     (- (or end-time (time-to-seconds)) start-time)))
               (exit-code (cond (exit-status (format "%d" exit-status))
                                (end-time "???")
@@ -245,7 +245,8 @@ If ARG is non-nil skip quitting the menu."
                      (format-time-string "%b %d %R" start-time)
                    (format "%s ago" (format-time-diff seconds))))))
           (push `(,item
-                  [,(propertize name 'face (unless end-time 'bold))
+                  [,(if end-time "" "*")
+                   ,name
                    ,(propertize directory 'face 'dired-directory)
                    ,age
                    ,exit-code
