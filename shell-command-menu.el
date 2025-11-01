@@ -205,9 +205,8 @@ If ARG is non-nil skip quitting the menu."
                      (time-to-seconds)))))
 
 (defun shell-command-menu--current-info (&rest _ignored)
-  (when-let* ((name
-               (shell-command-menu--item-name (tabulated-list-get-id))))
-    (format "Command: %s" name)))
+  (when-let* ((row (tabulated-list-get-id)))
+    (format "Command: %s" (shell-command-menu--item-name row))))
 
 (defun async-shell-command--fix-tramp (process)
   ;; TODO: Should upstream, this is clearly an oversight
