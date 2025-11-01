@@ -218,9 +218,9 @@ If ARG is non-nil skip quitting the menu."
 
 (defun shell-command-menu--refresh ()
   (setq tabulated-list-format [("" 1 t)
-                               ("Directory" 40 t)
-                               ("Time" 7 t :right-align t)
+                               ("Directory" 33 t)
                                ("When"  12 t :right-align t)
+                               ("Time" 7 t :right-align t)
                                ("Stat" 4 t :right-align t)
                                ("Command" 0 t)])
   (setq tabulated-list-entries nil)
@@ -242,9 +242,9 @@ If ARG is non-nil skip quitting the menu."
                    (format "%s ago" (format-time-diff seconds))))))
           (push `(,item
                   [""
-                   ,directory
-                   ,age
+                   ,(string-truncate-left directory 33)
                    ,since
+                   ,age
                    ,exit-code
                    ,(propertize name 'face 'proced-executable)])
                 tabulated-list-entries)))))
