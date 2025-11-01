@@ -193,6 +193,36 @@ If ARG is non-nil skip quitting the menu."
   (interactive nil shell-command-menu)
   (find-file (shell-command-menu--file-name (tabulated-list-get-id))))
 
+(defun shell-command-menu-filter-project ()
+  "Filter shell command list by current project."
+  (interactive)
+  (setq shell-command-menu--predicate
+        (if shell-command-menu--predicate
+            nil
+          (lambda (item)
+            (let ((file-name
+                   (or (when-let* ((project (project-current)))
+                         (project-root project))
+                       default-directory)))
+              (string-prefix-p
+               (abbreviate-file-name file-name)
+               (with-slots (directory) item
+                 (if (file-remote-p directory)
+                     directory
+                   (abbreviate-file-name directory))))))))
+  (revert-buffer))
+
+
+(defun shell-command-menu-filter-live ()
+  "Filter shell command list by live process."
+  (interactive)
+  (setq shell-command-menu--predicate
+        (if shell-command-menu--predicate
+            nil
+          (lambda (item)
+            (with-slots (end-time) item (not end-time)))))
+  (revert-buffer))
+
 
 ;;; Integration's
 
@@ -216,6 +246,8 @@ If ARG is non-nil skip quitting the menu."
 
 ;;; Mode
 
+(defvar shell-command-menu--predicate nil)
+
 (defun shell-command-menu--refresh ()
   (setq tabulated-list-format [("" 1 t)
                                ("Directory" 33 t)
@@ -229,25 +261,27 @@ If ARG is non-nil skip quitting the menu."
                     ((> diff (* 60 60)) (format-seconds "%hh %mm" diff))
                     (t (format-seconds "%mm %ss%z" diff)))))
     (dolist (item shell-command-menu-items)
-      (with-slots (name directory start-time end-time exit-status) item
-        (let ((age (format-time-diff
-                    (- (or end-time (time-to-seconds)) start-time)))
-              (exit-code (cond (exit-status (format "%d" exit-status))
-                               (end-time "??")
-                               ("--")))
-              (since
-               (let ((seconds (- (time-to-seconds) start-time)))
-                 (if (> seconds (* 7 24 60 60))
-                     (format-time-string "%b %d %R" start-time)
-                   (format "%s ago" (format-time-diff seconds))))))
-          (push `(,item
-                  [""
-                   ,(string-truncate-left directory 33)
-                   ,since
-                   ,age
-                   ,exit-code
-                   ,(propertize name 'face 'proced-executable)])
-                tabulated-list-entries)))))
+      (when (or (not shell-command-menu--predicate)
+                (funcall shell-command-menu--predicate item))
+        (with-slots (name directory start-time end-time exit-status) item
+          (let ((age (format-time-diff
+                      (- (or end-time (time-to-seconds)) start-time)))
+                (exit-code (cond (exit-status (format "%d" exit-status))
+                                 (end-time "??")
+                                 ("--")))
+                (since
+                 (let ((seconds (- (time-to-seconds) start-time)))
+                   (if (> seconds (* 7 24 60 60))
+                       (format-time-string "%b %d %R" start-time)
+                     (format "%s ago" (format-time-diff seconds))))))
+            (push `(,item
+                    [""
+                     ,(string-truncate-left directory 33)
+                     ,since
+                     ,age
+                     ,exit-code
+                     ,(propertize name 'face 'proced-executable)])
+                  tabulated-list-entries))))))
   (setq tabulated-list-entries (nreverse tabulated-list-entries))
   (tabulated-list-init-header))
 
@@ -259,6 +293,8 @@ If ARG is non-nil skip quitting the menu."
     (define-key map "d"  #'shell-command-menu-kill-process)
     (define-key map "b"  #'shell-command-menu-switch-to-buffer)
     (define-key map "f"  #'shell-command-menu-find-output)
+    (define-key map "p"  #'shell-command-menu-filter-project)
+    (define-key map "a"  #'shell-command-menu-filter-live)
     map))
 
 (define-derived-mode shell-command-menu-mode tabulated-list-mode "Shell Command Menu"
@@ -272,12 +308,15 @@ If ARG is non-nil skip quitting the menu."
   "Display shell commands spawned by Emacs.
 If DISPLAY is nil do not display created buffer."
   (interactive (list t))
-  (with-current-buffer (get-buffer-create "*Shell Command List*")
-    (shell-command-menu-mode)
-    (revert-buffer)
-    (when display
-      (select-window (display-buffer (current-buffer)))
-      (goto-char (point-min)))))
+  (let ((directory default-directory))
+    (with-current-buffer (get-buffer-create "*Shell Command List*")
+      (shell-command-menu-mode)
+      (revert-buffer)
+      (when display
+        (setq default-directory directory
+              shell-command-menu--predicate nil)
+        (select-window (display-buffer (current-buffer)))
+        (goto-char (point-min))))))
 
 ;;;###autoload
 (define-minor-mode shell-command-menu-monitor-mode
