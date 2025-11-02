@@ -196,9 +196,10 @@ If ARG is non-nil skip quitting the menu."
 (defun shell-command-menu-filter-project ()
   "Filter shell command list by current project."
   (interactive)
-  (setq shell-command-menu--predicate
-        (if shell-command-menu--predicate
-            nil
+  (if shell-command-menu--predicate
+      (setq shell-command-menu--predicate nil
+            shell-command-menu--filter nil)
+    (setq shell-command-menu--predicate
           (lambda (item)
             (let ((file-name
                    (or (when-let* ((project (project-current)))
@@ -209,18 +210,20 @@ If ARG is non-nil skip quitting the menu."
                (with-slots (directory) item
                  (if (file-remote-p directory)
                      directory
-                   (abbreviate-file-name directory))))))))
+                   (abbreviate-file-name directory))))))
+          shell-command-menu--filter "project"))
   (revert-buffer))
-
 
 (defun shell-command-menu-filter-live ()
   "Filter shell command list by live process."
   (interactive)
-  (setq shell-command-menu--predicate
-        (if shell-command-menu--predicate
-            nil
-          (lambda (item)
-            (with-slots (end-time) item (not end-time)))))
+  (if shell-command-menu--predicate
+      (setq shell-command-menu--predicate nil
+            shell-command-menu--filter nil)
+      (setq shell-command-menu--predicate
+            (lambda (item)
+              (with-slots (end-time) item (not end-time)))
+            shell-command-menu--filter "live"))
   (revert-buffer))
 
 
@@ -247,6 +250,7 @@ If ARG is non-nil skip quitting the menu."
 ;;; Mode
 
 (defvar shell-command-menu--predicate nil)
+(defvar shell-command-menu--filter nil)
 
 (defun shell-command-menu--refresh ()
   (setq tabulated-list-format [("" 1 t)
@@ -301,7 +305,8 @@ If ARG is non-nil skip quitting the menu."
   "Major mode for listing the shell commands spawned by Emacs."
   :interactive nil
   (add-hook 'tabulated-list-revert-hook #'shell-command-menu--refresh nil t)
-  (eldoc-mode 1))
+  (setq mode-line-process
+        '(shell-command-menu--filter (" by " shell-command-menu--filter))))
 
 ;;;###autoload
 (defun shell-command-menu (display)
