@@ -205,42 +205,42 @@ If ARG is non-nil skip quitting the menu."
   (interactive (list (read-regexp "Command name" (grep-tag-default))))
   (shell-command-menu t)
   (if (string-empty-p regex)
-      (setq shell-command-menu--predicate nil
-            shell-command-menu--filter nil)
-    (setq shell-command-menu--predicate
-          (lambda (item)
-            (with-slots (name) item
-              (string-match-p regex name)))
-          shell-command-menu--filter (format "command [%s]" regex)))
+      (setq shell-command-menu--filter-alist
+            (assq-delete-all 'command shell-command-menu--filter-alist))
+    (setf (alist-get 'command shell-command-menu--filter-alist)
+          `(,(format "Command [%s]" regex)
+            ,(lambda (item)
+               (with-slots (name) item
+                 (string-match-p regex name))))))
   (revert-buffer))
 
 (defun shell-command-menu-filter-by-directory (directory)
   "Filter shell command list by DIRECTORY."
   (interactive "D" shell-command-menu)
   (shell-command-menu t)
-  (setq shell-command-menu--predicate
-        (let ((directory (abbreviate-file-name directory)))
-          (lambda (item)
-            (string-prefix-p directory
-                             (with-slots (directory) item
-                               (if (file-remote-p directory)
-                                   directory
-                                 (abbreviate-file-name directory))))))
-        shell-command-menu--filter "directory"
-        default-directory directory)
+  (setf (alist-get 'directory shell-command-menu--filter-alist)
+        `("Directory"
+          ,(let ((directory (abbreviate-file-name directory)))
+             (lambda (item)
+               (string-prefix-p directory
+                                (with-slots (directory) item
+                                  (if (file-remote-p directory)
+                                      directory
+                                    (abbreviate-file-name directory))))))))
+  (setq default-directory directory)
   (revert-buffer))
 
 (defun shell-command-menu-filter-by-live ()
   "Filter shell command list by live process."
   (interactive)
   (shell-command-menu t)
-  (if (equal shell-command-menu--filter "live")
-      (setq shell-command-menu--predicate nil
-            shell-command-menu--filter nil)
-      (setq shell-command-menu--predicate
-            (lambda (item)
-              (with-slots (end-time) item (not end-time)))
-            shell-command-menu--filter "live"))
+  (if (alist-get 'live shell-command-menu--filter-alist)
+      (setq shell-command-menu--filter-alist
+            (assq-delete-all 'live shell-command-menu--filter-alist))
+    (setf (alist-get 'live shell-command-menu--filter-alist)
+          `("Live"
+            ,(lambda (item)
+               (with-slots (end-time) item (not end-time))))))
   (revert-buffer))
 
 
@@ -266,8 +266,7 @@ If ARG is non-nil skip quitting the menu."
 
 ;;; Mode
 
-(defvar shell-command-menu--predicate nil)
-(defvar shell-command-menu--filter nil)
+(defvar shell-command-menu--filter-alist nil)
 
 (defun shell-command-menu--refresh ()
   (setq tabulated-list-format [("" 1 t)
@@ -282,8 +281,10 @@ If ARG is non-nil skip quitting the menu."
                     ((> diff (* 60 60)) (format-seconds "%hh %mm" diff))
                     (t (format-seconds "%mm %ss%z" diff)))))
     (dolist (item shell-command-menu-items)
-      (when (or (not shell-command-menu--predicate)
-                (funcall shell-command-menu--predicate item))
+      (when (or (not shell-command-menu--filter-alist)
+                (cl-loop for (_ _ f) in shell-command-menu--filter-alist
+                         unless (funcall f item) return nil
+                         finally return t))
         (with-slots (name directory start-time end-time exit-status) item
           (let ((age (format-time-diff
                       (- (or end-time (time-to-seconds)) start-time)))
@@ -311,11 +312,11 @@ If ARG is non-nil skip quitting the menu."
     (define-key map "\r" #'shell-command-menu-open)
     (define-key map "r"  #'shell-command-menu-run)
     (define-key map "e"  #'shell-command-menu-edit)
-    (define-key map "d"  #'shell-command-menu-kill-process)
+    (define-key map "x"  #'shell-command-menu-kill-process)
     (define-key map "b"  #'shell-command-menu-switch-to-buffer)
     (define-key map "f"  #'shell-command-menu-find-output)
     (define-key map "s"  #'shell-command-menu-filter-by-command)
-    (define-key map "h"  #'shell-command-menu-filter-by-directory)
+    (define-key map "d"  #'shell-command-menu-filter-by-directory)
     (define-key map "a"  #'shell-command-menu-filter-by-live)
     map))
 
@@ -324,7 +325,11 @@ If ARG is non-nil skip quitting the menu."
   :interactive nil
   (add-hook 'tabulated-list-revert-hook #'shell-command-menu--refresh nil t)
   (setq mode-line-process
-        '(shell-command-menu--filter (" by " shell-command-menu--filter))))
+        '(shell-command-menu--filter-alist
+          (" by "
+           (:eval
+            (mapconcat #'identity (mapcar #'cadr shell-command-menu--filter-alist)
+                       " and "))))))
 
 ;;;###autoload
 (defun shell-command-menu (display &optional reset)
@@ -337,8 +342,7 @@ If RESET is non nil reset filter state."
       (shell-command-menu-mode)
       (setq default-directory directory)
       (when reset
-        (setq shell-command-menu--predicate nil
-              shell-command-menu--filter nil))
+        (setq shell-command-menu--filter-alist nil))
       (revert-buffer)
       (when display
         (select-window (display-buffer (current-buffer)))
