@@ -219,7 +219,8 @@ If ARG is non-nil skip quitting the menu."
   (interactive "D" shell-command-menu)
   (shell-command-menu t)
   (setf (alist-get 'directory shell-command-menu--filter-alist)
-        `("Directory"
+        `(,(format "Directory [%s]"
+                   (file-name-nondirectory (directory-file-name directory)))
           ,(let ((directory (abbreviate-file-name directory)))
              (lambda (item)
                (string-prefix-p directory
