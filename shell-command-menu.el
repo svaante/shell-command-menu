@@ -176,6 +176,13 @@ If ARG is non-nil skip quitting the menu."
              (setf end-time (time-to-seconds))
              (user-error "No associated process found for `%s'" name))))
 
+(defun shell-command-menu-open ()
+  "Switch to active buffer or logs of command."
+  (interactive nil shell-command-menu)
+  (condition-case err
+      (shell-command-menu-switch-to-buffer)
+    (user-error (shell-command-menu-find-output))))
+
 (defun shell-command-menu-switch-to-buffer ()
   "Switch to buffer of shell command."
   (interactive nil shell-command-menu)
@@ -191,33 +198,65 @@ If ARG is non-nil skip quitting the menu."
 (defun shell-command-menu-find-output ()
   "Open output file of COMMAND."
   (interactive nil shell-command-menu)
-  (find-file (shell-command-menu--file-name (tabulated-list-get-id))))
+  (find-file-read-only (shell-command-menu--file-name (tabulated-list-get-id))))
 
-(defun shell-command-menu-filter-project ()
-  "Filter shell command list by current project."
-  (interactive)
-  (if shell-command-menu--predicate
+(defun shell-command-menu-filter-by-command (regex)
+  "Filter shell command list by REGEX match of command."
+  (interactive (list (read-regexp "Command name" (grep-tag-default))))
+  (shell-command-menu t)
+  (if (string-empty-p regex)
       (setq shell-command-menu--predicate nil
             shell-command-menu--filter nil)
     (setq shell-command-menu--predicate
           (lambda (item)
-            (let ((file-name
-                   (or (when-let* ((project (project-current)))
-                         (project-root project))
-                       default-directory)))
-              (string-prefix-p
-               (abbreviate-file-name file-name)
-               (with-slots (directory) item
-                 (if (file-remote-p directory)
-                     directory
-                   (abbreviate-file-name directory))))))
+            (with-slots (name) item
+              (string-match-p regex name)))
+          shell-command-menu--filter (format "command[%s]" regex)))
+  (revert-buffer))
+
+(defun shell-command-menu-filter-by-directory (directory)
+  "Filter shell command list by DIRECTORY."
+  (interactive "D" shell-command-menu)
+  (shell-command-menu t)
+  (setq shell-command-menu--predicate
+        (let ((directory (abbreviate-file-name directory)))
+          (lambda (item)
+            (string-prefix-p directory
+                             (with-slots (directory) item
+                               (if (file-remote-p directory)
+                                   directory
+                                 (abbreviate-file-name directory))))))
+        shell-command-menu--filter "directory"
+        default-directory directory)
+  (revert-buffer))
+
+(defun shell-command-menu-filter-by-project ()
+  "Filter shell command list by current project."
+  (interactive)
+  (shell-command-menu t)
+  (if (equal shell-command-menu--filter "project")
+      (setq shell-command-menu--predicate nil
+            shell-command-menu--filter nil)
+    (setq shell-command-menu--predicate
+          (let ((file-name
+                 (abbreviate-file-name
+                  (or (when-let* ((project (project-current)))
+                        (project-root project))
+                      default-directory))))
+            (lambda (item)
+              (string-prefix-p file-name
+                               (with-slots (directory) item
+                                 (if (file-remote-p directory)
+                                     directory
+                                   (abbreviate-file-name directory))))))
           shell-command-menu--filter "project"))
   (revert-buffer))
 
-(defun shell-command-menu-filter-live ()
+(defun shell-command-menu-filter-by-live ()
   "Filter shell command list by live process."
   (interactive)
-  (if shell-command-menu--predicate
+  (shell-command-menu t)
+  (if (equal shell-command-menu--filter "live")
       (setq shell-command-menu--predicate nil
             shell-command-menu--filter nil)
       (setq shell-command-menu--predicate
@@ -291,14 +330,16 @@ If ARG is non-nil skip quitting the menu."
 
 (defvar shell-command-menu-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map "\r" #'shell-command-menu-run)
+    (define-key map "\r" #'shell-command-menu-open)
     (define-key map "r"  #'shell-command-menu-run)
     (define-key map "e"  #'shell-command-menu-edit)
     (define-key map "d"  #'shell-command-menu-kill-process)
     (define-key map "b"  #'shell-command-menu-switch-to-buffer)
     (define-key map "f"  #'shell-command-menu-find-output)
-    (define-key map "p"  #'shell-command-menu-filter-project)
-    (define-key map "a"  #'shell-command-menu-filter-live)
+    (define-key map "s"  #'shell-command-menu-filter-by-command)
+    (define-key map "h"  #'shell-command-menu-filter-by-directory)
+    (define-key map "p"  #'shell-command-menu-filter-by-project)
+    (define-key map "a"  #'shell-command-menu-filter-by-live)
     map))
 
 (define-derived-mode shell-command-menu-mode tabulated-list-mode "Shell Command Menu"
@@ -318,8 +359,7 @@ If DISPLAY is nil do not display created buffer."
       (shell-command-menu-mode)
       (revert-buffer)
       (when display
-        (setq default-directory directory
-              shell-command-menu--predicate nil)
+        (setq default-directory directory)
         (select-window (display-buffer (current-buffer)))
         (goto-char (point-min))))))
 
