@@ -245,29 +245,6 @@ If ARG is non-nil skip quitting the menu."
   (revert-buffer))
 
 
-;;; Integration's
-
-(with-eval-after-load 'savehist
-  (add-to-list 'savehist-minibuffer-history-variables
-               'shell-command-menu-items)
-  ;; XXX: Make sure that commands from disk have recorded end time.
-  (cl-loop for item in shell-command-menu-items do
-           (setf (shell-command-menu--item-end-time item)
-                 (or (shell-command-menu--item-end-time item)
-                     (time-to-seconds)))))
-
-(with-eval-after-load 'evil
-  (evil-make-overriding-map shell-command-menu-mode-map))
-
-(defun async-shell-command--fix-tramp (process)
-  ;; TODO: Should upstream, this is clearly an oversight
-  (when (processp process)
-    (with-current-buffer (process-buffer process)
-      (shell-command-mode))))
-
-(advice-add #'tramp-handle-shell-command
-            :filter-return #'async-shell-command--fix-tramp)
-
 ;;; Mode
 
 (defvar shell-command-menu--filter-alist nil)
@@ -359,6 +336,30 @@ If RESET is non nil reset filter state."
   (cl-loop for (_ _ hook) in shell-command-menu-modes do
            (funcall (if shell-command-menu-monitor-mode #'add-hook #'remove-hook)
                     hook #'shell-command-menu--hook)))
+
+
+;;; Integration's
+
+(with-eval-after-load 'savehist
+  (add-to-list 'savehist-minibuffer-history-variables
+               'shell-command-menu-items)
+  ;; XXX: Make sure that commands from disk have recorded end time.
+  (cl-loop for item in shell-command-menu-items do
+           (setf (shell-command-menu--item-end-time item)
+                 (or (shell-command-menu--item-end-time item)
+                     (time-to-seconds)))))
+
+(with-eval-after-load 'evil
+  (evil-make-overriding-map shell-command-menu-mode-map))
+
+(defun async-shell-command--fix-tramp (process)
+  ;; TODO: Should upstream, this is clearly an oversight
+  (when (processp process)
+    (with-current-buffer (process-buffer process)
+      (shell-command-mode))))
+
+(advice-add #'tramp-handle-shell-command
+            :filter-return #'async-shell-command--fix-tramp)
 
 (provide 'shell-command-menu)
 ;;; shell-command-menu.el ends here
