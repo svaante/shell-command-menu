@@ -256,6 +256,10 @@ If ARG is non-nil skip quitting the menu."
                  (or (shell-command-menu--item-end-time item)
                      (time-to-seconds)))))
 
+(with-eval-after-load 'evil
+  (evil-make-overriding-map shell-command-menu-mode-map))
+
+
 (defun async-shell-command--fix-tramp (process)
   ;; TODO: Should upstream, this is clearly an oversight
   (when (processp process)
