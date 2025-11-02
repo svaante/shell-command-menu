@@ -230,28 +230,6 @@ If ARG is non-nil skip quitting the menu."
         default-directory directory)
   (revert-buffer))
 
-(defun shell-command-menu-filter-by-project ()
-  "Filter shell command list by current project."
-  (interactive)
-  (shell-command-menu t)
-  (if (equal shell-command-menu--filter "project")
-      (setq shell-command-menu--predicate nil
-            shell-command-menu--filter nil)
-    (setq shell-command-menu--predicate
-          (let ((file-name
-                 (abbreviate-file-name
-                  (or (when-let* ((project (project-current)))
-                        (project-root project))
-                      default-directory))))
-            (lambda (item)
-              (string-prefix-p file-name
-                               (with-slots (directory) item
-                                 (if (file-remote-p directory)
-                                     directory
-                                   (abbreviate-file-name directory))))))
-          shell-command-menu--filter "project"))
-  (revert-buffer))
-
 (defun shell-command-menu-filter-by-live ()
   "Filter shell command list by live process."
   (interactive)
@@ -338,7 +316,6 @@ If ARG is non-nil skip quitting the menu."
     (define-key map "f"  #'shell-command-menu-find-output)
     (define-key map "s"  #'shell-command-menu-filter-by-command)
     (define-key map "h"  #'shell-command-menu-filter-by-directory)
-    (define-key map "p"  #'shell-command-menu-filter-by-project)
     (define-key map "a"  #'shell-command-menu-filter-by-live)
     map))
 
