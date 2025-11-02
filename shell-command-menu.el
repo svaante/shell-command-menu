@@ -211,7 +211,7 @@ If ARG is non-nil skip quitting the menu."
           (lambda (item)
             (with-slots (name) item
               (string-match-p regex name)))
-          shell-command-menu--filter (format "command[%s]" regex)))
+          shell-command-menu--filter (format "command [%s]" regex)))
   (revert-buffer))
 
 (defun shell-command-menu-filter-by-directory (directory)
@@ -350,16 +350,20 @@ If ARG is non-nil skip quitting the menu."
         '(shell-command-menu--filter (" by " shell-command-menu--filter))))
 
 ;;;###autoload
-(defun shell-command-menu (display)
+(defun shell-command-menu (display &optional reset)
   "Display shell commands spawned by Emacs.
-If DISPLAY is nil do not display created buffer."
-  (interactive (list t))
+If DISPLAY is nil do not display created buffer.
+If RESET is non nil reset filter state."
+  (interactive (list t t))
   (let ((directory default-directory))
     (with-current-buffer (get-buffer-create "*Shell Command List*")
       (shell-command-menu-mode)
+      (setq default-directory directory)
+      (when reset
+        (setq shell-command-menu--predicate nil
+              shell-command-menu--filter nil))
       (revert-buffer)
       (when display
-        (setq default-directory directory)
         (select-window (display-buffer (current-buffer)))
         (goto-char (point-min))))))
 
